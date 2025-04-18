@@ -1,6 +1,27 @@
+const os = require('os');
 const fs = require('fs');
 const readline = require('readline');
 const { execSync } = require('child_process');
+
+// Cek dan update Node.js & npm jika dijalankan di Linux
+function updateNodeAndNpm() {
+    if (os.platform() === 'linux') {
+        try {
+            console.log('🔧 Deteksi Linux - memperbarui Node.js dan npm...');
+            execSync('which curl || sudo apt update && sudo apt install curl -y', { stdio: 'inherit' });
+            execSync('curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -', { stdio: 'inherit' });
+            execSync('sudo apt-get install -y nodejs', { stdio: 'inherit' });
+            execSync('sudo npm install -g npm', { stdio: 'inherit' });
+            console.log('✅ Node.js dan npm berhasil diperbarui.');
+        } catch (error) {
+            console.error('❌ Gagal memperbarui Node.js/npm:', error.message);
+        }
+    } else {
+        console.log('⚠️ Bukan sistem Linux, melewati proses update Node.js/npm.');
+    }
+}
+
+updateNodeAndNpm();
 
 // Cek dan install dependensi jika belum terinstal
 function installDependencies() {
@@ -9,7 +30,7 @@ function installDependencies() {
         require.resolve('ethers');
         require.resolve('dotenv');
     } catch (e) {
-        console.log('Menginstal dependensi...');
+        console.log('📦 Menginstal dependensi...');
         execSync('npm install node-telegram-bot-api ethers dotenv', { stdio: 'inherit' });
     }
 }
@@ -83,11 +104,16 @@ async function setupEnv() {
         const balances = await Promise.all(
             Object.keys(rpcUrls).map(async (network) => {
                 const balance = await fetchBalance(network, address);
-                return `${network.toUpperCase()}: ${balance} ETH`;
+                return `• <b>${network.toUpperCase()}</b>: <code>${balance} ETH</code>`;
             })
         );
 
-        bot.sendMessage(chatId, balances.join('\n'));
+        const now = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+
+        const message = `<b>💰 Balance for address:</b>\n<code>${address}</code>\n\n${balances.join('\n')}\n\n⏰ <i>Last update:</i> ${now}`;
+
+        bot.sendMessage(chatId, message, { parse_mode: 'HTML' });
+
         setTimeout(() => sendBalanceUpdate(chatId, address), 10 * 60 * 1000);
     }
 
@@ -96,10 +122,10 @@ async function setupEnv() {
         const address = match[1].trim();
 
         if (!address.match(/^0x[a-fA-F0-9]{40}$/)) {
-            return bot.sendMessage(chatId, 'Invalid Ethereum address!');
+            return bot.sendMessage(chatId, '⚠️ Alamat Ethereum tidak valid!');
         }
 
-        bot.sendMessage(chatId, 'Checking balance, please wait...');
+        bot.sendMessage(chatId, '🔍 Mengecek saldo, mohon tunggu...');
         userTracking[chatId] = address;
         sendBalanceUpdate(chatId, address);
     });
@@ -107,8 +133,8 @@ async function setupEnv() {
     bot.onText(/\/stop/, (msg) => {
         const chatId = msg.chat.id;
         delete userTracking[chatId];
-        bot.sendMessage(chatId, 'Auto balance update stopped.');
+        bot.sendMessage(chatId, '🛑 Update otomatis dihentikan.');
     });
 
-    console.log('Bot is running...');
+    console.log('🤖 Bot is running...');
 })();
